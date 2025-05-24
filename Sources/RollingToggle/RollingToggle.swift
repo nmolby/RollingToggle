@@ -1,63 +1,64 @@
 import SwiftUI
 
-/// A toggle style that rolls between two views
+/// A toggle view that rolls between two content views.
 ///
-/// Provide exactly two views inside of your toggle.
-/// The toggle will roll between them `rotationCount` times
+/// `RollingToggle` renders two views and switches between them with a rotation
+/// effect when toggled. It supports both horizontal and vertical axes of motion,
+/// and customizable rotation repetition via `rotationCount`.
 ///
-/// ```swift
-/// Toggle(isOn: $isOn) {
-///     Text("😀")
-///     Text("🙁")
-/// }
-/// .toggleStyle(RollingToggle())
-/// ```
+/// Initialize with two content views using trailing closures, and bind to a
+/// `Bool` state to drive the toggle. Rotation will occur upon state change.
 ///
-/// You can also specify the axis and the rotation count
+/// Example:
 ///
 /// ```swift
-/// Toggle(isOn: $isOn) {
-///     Text("😀")
-///     Text("🙁")
+/// RollingToggle(isOn: $isOn) {
+///     Text("On")
+/// } secondView: {
+///     Text("Off")
 /// }
-/// .toggleStyle(RollingToggle(rotationCount: 3, axis: .vertical))
 /// ```
+///
+/// You can also specify the number of rotation cycles and axis:
+///
+/// ```swift
+/// RollingToggle(isOn: $isOn, rotationCount: 2, axis: .vertical) {
+///     Image(systemName: "sun.max")
+/// } secondView: {
+///     Image(systemName: "moon")
+/// }
+/// ```
+///
 /// - Parameters:
-///   - rotationCount: Number of times the first view rotates to become the second view
-///   - axis: The axis to move across
-public struct RollingToggle: ToggleStyle {
-    let rotationCount: Int
-    let axis: Axis
-    
-    init(rotationCount: Int = 1, axis: Axis = .horizontal) {
-        self.rotationCount = rotationCount
-        self.axis = axis
-    }
-    
-    public func makeBody(configuration: Configuration) -> some View {
-        Group(subviews: configuration.label) { subviews in
-            if subviews.count != 2 {
-                EmptyView()
-            } else {
-                RollingToggleHelper(
-                    firstView: subviews[0],
-                    secondView: subviews[1],
-                    rotationCount: rotationCount,
-                    axis: axis,
-                    isOn: configuration.$isOn
-                )
-            }
-        }
-    }
-}
+///   - isOn: A binding to the toggle's state.
+///   - rotationCount: The number of full 360° rotations applied on toggle. Default is 1.
+///   - axis: The axis to rotate around (.horizontal or .vertical). Default is `.horizontal`.
+///   - firstView: The view shown when `isOn` is `true`.
+///   - secondView: The view shown when `isOn` is `false`.
 
-private struct RollingToggleHelper: View {
-    let firstView: Subview
-    let secondView: Subview
-    let rotationCount: Int
-    let axis: Axis
+public struct RollingToggle<FirstView: View, SecondView: View>: View {
     
     @Binding var isOn: Bool
+
+    @ViewBuilder let firstView: () -> FirstView
+    @ViewBuilder let secondView: () -> SecondView
+    let rotationCount: Int
+    let axis: Axis
+    
+    
+    init(
+        isOn: Binding<Bool>,
+        rotationCount: Int = 1,
+        axis: Axis = .horizontal,
+        @ViewBuilder firstView: @escaping () -> FirstView,
+        @ViewBuilder  secondView: @escaping () -> SecondView,
+    ) {
+        self.firstView = firstView
+        self.secondView = secondView
+        self.rotationCount = rotationCount
+        self.axis = axis
+        self._isOn = isOn
+    }
     
     var frameAlignment: Alignment {
         switch axis {
@@ -76,7 +77,7 @@ private struct RollingToggleHelper: View {
         axis == .vertical ? .infinity : nil
     }
     
-    var body: some View {
+    public var body: some View {
         Button {
             withAnimation(.bouncy) {
                 isOn.toggle()
@@ -98,57 +99,35 @@ private struct RollingToggleHelper: View {
     
     var rollingView: some View {
         ZStack {
-            firstView
+            firstView()
                 .opacity(isOn ? 1 : 0)
             
-            secondView
+            secondView()
                 .opacity(isOn ? 0 : 1)
         }
     }
     
 }
 
+@available(iOS 18.0, macOS 15, *)
 #Preview {
     @Previewable @State var isOn = true
     VStack(spacing: 20) {
-        Toggle(isOn: $isOn) {
-            Text("😀")
-            Text("🙁")
-        }
-        .background {
-            Group {
-                if isOn {
-                    Color.blue.opacity(0.2)
-                } else {
-                    Color.red.opacity(0.2)
-                }
-            }
-            .mask {
-                RoundedRectangle(cornerRadius: 8)
-            }
+        RollingToggle(isOn: $isOn) {
+            Text("On")
+        } secondView: {
+            Text("Off")
         }
         
-        Toggle(isOn: $isOn) {
-            Image(systemName: "eyebrow")
-            Image(systemName: "nose")
+        RollingToggle(isOn: $isOn, rotationCount: 2, axis: .vertical) {
+            Image(systemName: "sun.max")
+        } secondView: {
+            Image(systemName: "moon")
         }
-        .foregroundStyle(isOn ? .orange : .purple)
-        .background {
-            Group {
-                if isOn {
-                    Color.green.opacity(0.2)
-                } else {
-                    Color.mint.opacity(0.2)
-                }
-            }
-            .mask {
-                RoundedRectangle(cornerRadius: 8)
-            }
-        }
-        .frame(width: 200)
         
-        Toggle(isOn: $isOn) {
+        RollingToggle(isOn: $isOn, axis: .horizontal) {
             Image(systemName: "hand.thumbsup")
+        } secondView: {
             Image(systemName: "hand.thumbsdown.fill")
         }
         .foregroundStyle(isOn ? .pink : .cyan)
@@ -165,10 +144,9 @@ private struct RollingToggleHelper: View {
             }
         }
         .frame(height: 200)
-        .toggleStyle(RollingToggle(rotationCount: 1, axis: .vertical))
+        .toggleStyle(RollingToggleStyle(rotationCount: 1, axis: .vertical))
     }
     .font(.system(size: 75))
     .frame(width: 300)
-    .toggleStyle(RollingToggle(rotationCount: 1))
-
+    .toggleStyle(RollingToggleStyle(rotationCount: 1))
 }
